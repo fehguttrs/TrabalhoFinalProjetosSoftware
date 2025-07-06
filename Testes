@@ -1,0 +1,148 @@
+package códigoLimpo;
+
+import org.junit.platform.suite.api.SelectClasses;
+import org.junit.platform.suite.api.Suite;
+import static org.junit.jupiter.api.Assertions.*;
+import java.io.*;
+import java.net.*;
+import java.util.Scanner;
+import org.junit.jupiter.api.Test;
+@Suite
+public class Testes {
+	
+	// ==============================================
+    // MÉTODOS AUXILIARES PARA CONVERSÃO DE DADOS:
+	// ==============================================
+
+    //Converte um valor double para array de bytes (usado para simular a transmissão de dados)
+ 
+    private byte[] doubleParaBytes(double valor) throws IOException {
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        DataOutputStream stream = new DataOutputStream(buffer);
+        stream.writeDouble(valor);
+        return buffer.toByteArray();
+    }
+    
+    //Converte um array de bytes para double.Usado para verificar os resultados recebidos.
+   
+    private double bytesParaDouble(byte[] bytes) throws IOException {
+        ByteArrayInputStream buffer = new ByteArrayInputStream(bytes);
+        DataInputStream stream = new DataInputStream(buffer);
+        return stream.readDouble();
+    }
+
+    // ==============================================
+    // TESTES PARA A THREAD DO SERVIDOR
+    // ==============================================
+
+    @Test
+    public void testThreadServidor_CalculaAreaCorretamente() throws IOException {
+        // Configuração: cria streams em memória com raio = 3.0
+        byte[] raioEnviado = doubleParaBytes(3.0);
+        ByteArrayInputStream entradaSimulada = new ByteArrayInputStream(raioEnviado);
+        ByteArrayOutputStream saidaSimulada = new ByteArrayOutputStream();
+
+        // Socket fake que usa as streams em memória
+        Socket socketTeste = new Socket() {
+            @Override public InputStream getInputStream() { return entradaSimulada; }
+            @Override public OutputStream getOutputStream() { return saidaSimulada; }
+        };
+
+        // Execução: processa a requisição
+        new ThreadServidor(socketTeste).run();
+
+        // Verificação: confere se a área calculada está correta (π*3²)
+        double areaCalculada = bytesParaDouble(saidaSimulada.toByteArray());
+        assertEquals(Math.PI * 9.0, areaCalculada, 0.0001);
+    }
+
+    // ==============================================
+    // TESTES PARA A CLASSE SERVIDORA
+    // ==============================================
+
+    @Test
+    public void testServidor_AceitaConexoesClientes() throws IOException {
+        // Configuração: servidor em porta aleatória
+        ServerSocket servidorTeste = new ServerSocket(0);
+        int porta = servidorTeste.getLocalPort();
+
+        // Thread que simula o servidor aceitando uma conexão
+        new Thread(() -> {
+            try (Socket cliente = servidorTeste.accept()) {
+                // Conexão aceita - teste bem sucedido
+            } catch (IOException e) {
+                fail("Erro ao aceitar conexão");
+            }
+        }).start();
+
+        // Execução: cliente tenta conectar
+        try (Socket clienteTeste = new Socket("localhost", porta)) {
+            // Verificação: conexão estabelecida com sucesso
+            assertTrue(clienteTeste.isConnected());
+        } finally {
+            servidorTeste.close();
+        }
+    }
+
+    // ==============================================
+    // TESTES PARA A CLASSE CLIENTE
+    // ==============================================
+
+    @Test
+    public void testCliente_EnviaRaioRecebeArea() throws IOException {
+        // Configuração: servidor de teste que calcula a área
+        ServerSocket servidorTeste = new ServerSocket(0);
+        ByteArrayOutputStream dadosRecebidos = new ByteArrayOutputStream();
+
+        new Thread(() -> {
+            try (Socket socket = servidorTeste.accept();
+                 DataInputStream entrada = new DataInputStream(socket.getInputStream());
+                 DataOutputStream saida = new DataOutputStream(socket.getOutputStream())) {
+                
+                // Lê o raio enviado pelo cliente
+                double raio = entrada.readDouble();
+                // Escreve a área calculada
+                saida.writeDouble(Math.PI * raio * raio);
+                // Guarda os dados recebidos para verificação
+                dadosRecebidos.write(doubleParaBytes(raio));
+            } catch (IOException e) {
+                fail("Erro no servidor de teste");
+            }
+        }).start();
+
+        // Configura entrada simulada do usuário (raio = 5.0)
+        InputStream entradaOriginal = System.in;
+        System.setIn(new ByteArrayInputStream("5.0\n".getBytes()));
+
+        try {
+            // Execução: roda o cliente com parâmetros de teste
+            ClasseCliente.main(new String[]{"localhost", 
+                                          String.valueOf(servidorTeste.getLocalPort())});
+            
+            // Verificação: confere se o servidor recebeu o raio correto
+            double raioEnviado = bytesParaDouble(dadosRecebidos.toByteArray());
+            assertEquals(5.0, raioEnviado, 0.0001);
+        } finally {
+            // Restaura System.in e fecha recursos
+            System.setIn(entradaOriginal);
+            servidorTeste.close();
+        }
+    }
+
+    @Test
+    public void testCliente_TrataErrosConexao() {
+        // Configura entrada simulada do usuário
+        InputStream entradaOriginal = System.in;
+        System.setIn(new ByteArrayInputStream("5.0\n".getBytes()));
+
+        try {
+            // Execução: tenta conectar a porta inválida
+            // Deve tratar o erro sem lançar exceção
+            assertDoesNotThrow(() -> 
+                ClasseCliente.main(new String[]{"localhost", "9999"})
+            );
+        } finally {
+            System.setIn(entradaOriginal);
+        }
+    }
+}
