@@ -1,0 +1,56 @@
+package códigoLimpo;
+
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.net.Socket;
+
+//conexão cliente-servidor para calcular a área de um círculo dado o raio enviado pelo cliente
+ 
+public class ThreadServidor extends Thread {
+	
+	 private final Socket socket;  // socket desta conexão
+
+	    //Construtor recebe o socket do cliente já aceito pelo ServerSocket.
+	    public ThreadServidor(Socket socket) {
+	        this.socket = socket;
+	    }
+
+	    @Override
+	    public void run() {
+	        try {
+	            //Exibe no console que chegou uma nova conexão
+	            System.out.printf("Conexão recebida de %s%n", 
+	                socket.getInetAddress().getHostName());
+
+	            //Leitura do raio que foi enviado pelo cliente
+	            DataInputStream input = new DataInputStream(socket.getInputStream());
+	            double raio = input.readDouble();
+
+	            //Cálculo da área do círculo pela fórmula
+	            double area = Math.PI * Math.pow(raio, 2);
+
+	            //Envia o resultado de volta ao cliente
+	            DataOutputStream output = new DataOutputStream(socket.getOutputStream());
+	            output.writeDouble(area);
+	            output.flush();
+
+	            //Fecha os streams de entrada e saída
+	            input.close();
+	            output.close();
+
+	            //Exibe no console que a conexão foi encerrada
+	            System.out.printf("Conexão finalizada com %s%n", 
+	                socket.getInetAddress().getHostName());
+
+	        } catch (IOException e) {
+	            // Em caso de erro de I/O, imprime stack trace para diagnóstico
+	            e.printStackTrace();
+	        } finally {
+	            // Garante fechamento do socket mesmo em caso de exceção
+	            try {
+	                socket.close();
+	            } catch (IOException ignore) { }
+	        }
+	    }
+}
