@@ -1,0 +1,40 @@
+package códigoLimpo;
+
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.net.Socket;
+
+//ClasseServidora inicializa o servidor, aguarda conexões e cria uma ThreadServidor para cada cliente que se conecta
+
+public class ClasseServidora {
+	
+	// Porta em que o servidor ficará escutando
+    private static final int PORTA = 7080;
+
+    public static void main(String[] args) {
+        System.out.println("-----------------------------------------------------------");
+        System.out.println("                       SERVIDOR                            ");
+        System.out.println("-----------------------------------------------------------");
+
+        // Cria o ServerSocket que escuta na porta definida
+        try (ServerSocket serverSocket = new ServerSocket(PORTA)) {
+        	Socket clienteSocket;
+        	
+            // Loop infinito para aceitar conexões continuamente
+            while (true) {
+                System.out.println("Aguardando solicitação de conexão...");
+
+                // Bloqueia até que um cliente se conecte
+                clienteSocket = serverSocket.accept();
+
+                // Ao conectar, inicia uma nova thread para tratar esse cliente
+                ThreadServidor thread = new ThreadServidor(clienteSocket);
+                thread.start();
+            }
+
+        } catch (IOException e) {
+            // Caso ocorra erro de I/O, exibe stack trace para diagnóstico
+            e.printStackTrace();
+        }
+    }
+}
