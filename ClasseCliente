@@ -1,0 +1,53 @@
+package códigoLimpo;
+
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.net.Socket;
+import java.net.UnknownHostException;
+import java.util.Scanner;
+
+//ClasseCliente conecta-se ao servidor para enviar o raio de um círculo  e receber de volta a área calculada
+
+public class ClasseCliente {
+	
+	// Endereço IP e porta do servidor
+    private static final String SERVIDOR_IP = "192.168.0.16";
+    private static final int SERVIDOR_PORTA = 7080;
+
+    public static void main(String[] args) {
+        System.out.println("-----------------------------------------------------------");
+        System.out.println("                       CLIENTE                             ");
+        System.out.println("-----------------------------------------------------------");
+
+        // Socket para comunicação com o servidor
+        try (Socket socket = new Socket(SERVIDOR_IP, SERVIDOR_PORTA);
+             Scanner scanner = new Scanner(System.in)) {
+
+            //Solicita ao usuário o valor do raio
+            System.out.print("Informe o raio: ");
+            double raio = scanner.nextDouble();
+
+            //Envia o raio ao servidor
+            DataOutputStream output = new DataOutputStream(socket.getOutputStream());
+            output.writeDouble(raio);
+            output.flush();
+
+            //Pega a área calculada do servidor
+            DataInputStream input = new DataInputStream(socket.getInputStream());
+            double area = input.readDouble();
+            System.out.printf("Área do círculo: %.4f%n", area);
+
+            //Fechamento automático de streams e socket pelo try-with-resources
+
+        } catch (UnknownHostException e) {
+            // Host não encontrado ou IP inválido
+            System.err.println("Endereço do servidor não encontrado: " + SERVIDOR_IP);
+            e.printStackTrace();
+        } catch (IOException e) {
+            // Erros de I/O ao ler/escrever no socket
+            System.err.println("Erro de I/O na comunicação com o servidor:");
+            e.printStackTrace();
+        }
+    }
+}
